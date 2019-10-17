@@ -50,8 +50,8 @@ class BmpDump:
         self._header = list(bmp_raw_data[0:pixel_map_offset])
 
         bytes_per_line = self._width * (self._bpp / 8)
-        if bytes_per_line % 8 != 0:
-            self._line_bytes_padding = int(8 - (bytes_per_line % 8))
+        if bytes_per_line % 4 != 0:
+            self._line_bytes_padding = int(4 - (bytes_per_line % 4))
         else:
             self._line_bytes_padding = int(0)
 
@@ -84,6 +84,7 @@ class BmpDump:
         print("Colors in palette = " + str(self._colors_in_palette))
         print("Important colors = " + str(self._important_colors))
         print("Bmp pixel array size = " + str(len(self._bmp_pixel_array)))
+        print("Line padding = " + str(self._line_bytes_padding))
 
     def upside_down(self):
         pixel_lines = self._get_lines()
@@ -165,15 +166,18 @@ four_colors ={0: 0,   1: 0,     2: 0,     3: 0,
               8: 10,    9: 10,  10: 10,     11: 10,
               12: 15,   13: 15, 14: 15,     15: 15}
 
-x = BmpDump("testdata/mirror.bmp")
+bitmap = "testdata/mirror.bmp"
+
+x = BmpDump(bitmap)
 x.reverse()
+x.debug()
 x.dump("out/dumpRev.bmp", add_header=True, use_bytes=True, delimiter="")
 
-x = BmpDump("testdata/mirror.bmp")
+x = BmpDump(bitmap)
 x.upside_down()
 x.dump("out/dumpRot.bmp", add_header=True, use_bytes=True, delimiter="")
 
-x = BmpDump("testdata/mirror.bmp")
+x = BmpDump(bitmap)
 x.mirror()
 x.dump("out/dumpMirr.bmp", add_header=True, use_bytes=True, delimiter="")
 
@@ -182,7 +186,7 @@ for sel_col in range(16):
                  4: sel_col, 5: sel_col, 6: sel_col, 7: sel_col,
                  8: sel_col, 9: sel_col, 10: sel_col, 11: sel_col,
                  12: sel_col, 13: sel_col, 14: sel_col, 15: sel_col}
-    x = BmpDump("testdata/mirror.bmp")
+    x = BmpDump(bitmap)
     x.flip_colors(one_color)
-    file_name = "out/dumpcolor" + str(sel_col) + ".bmp"
-    x.dump(file_name, add_header=True, use_bytes=True, delimiter="")
+    f = "out/dumpcolor" + str(sel_col) + ".bmp"
+    x.dump(f, add_header=True, use_bytes=True, delimiter="")
