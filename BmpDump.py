@@ -16,6 +16,7 @@ class BmpDump:
     _colors_in_palette = 0
     _important_colors = 0
     _bytes_per_line = 0
+    _line_bytes_padding = 0
 
     def _chunk_array(self, data, length):
         return (data[0 + i:length + i] for i in range(0, len(data), length))
@@ -48,6 +49,12 @@ class BmpDump:
         self._bmp_pixel_array = list(bmp_raw_data[pixel_map_offset:])
         self._header = list(bmp_raw_data[0:pixel_map_offset])
 
+        bytes_per_line = self._width * (self._bpp / 8)
+        if bytes_per_line % 8 != 0:
+            self._line_bytes_padding = int(8 - (bytes_per_line % 8))
+        else:
+            self._line_bytes_padding = int(0)
+
         assert id_field == b'BM'
         assert dib_header_size == 40
         assert self._colors_in_palette == 0
@@ -60,6 +67,10 @@ class BmpDump:
             bmp_raw_data = f.read()
 
         self._open_bmp(bmp_raw_data)
+
+    def _get_lines(self):
+        bytes_per_line = (self._width * (self._bpp / 8)) + self._line_bytes_padding
+        return list(self._chunk_array(self._bmp_pixel_array, int(bytes_per_line) ))
 
     def debug(self):
         print("Bmp Width = " + str(self._width))
@@ -74,12 +85,8 @@ class BmpDump:
         print("Important colors = " + str(self._important_colors))
         print("Bmp pixel array size = " + str(len(self._bmp_pixel_array)))
 
-    def rotate180(self):
-        bytes_per_line = self._width * (self._bpp / 8)
-        if bytes_per_line % 8 != 0:
-            bytes_per_line = bytes_per_line - (bytes_per_line % 8) + 8
-
-        pixel_lines = list(self._chunk_array(self._bmp_pixel_array, int(bytes_per_line) ))
+    def upside_down(self):
+        pixel_lines = self._get_lines()
         reversed_lines = reversed(pixel_lines)
         self._bmp_pixel_array = list()
 
@@ -106,18 +113,30 @@ class BmpDump:
         self._bmp_pixel_array = flipped_pixels
 
     def mirror(self):
-        self.rotate180()
+        self.upside_down()
         self.reverse()
 
     def reverse(self):
         reversed_pixels = list()
-        for pixel in reversed(self._bmp_pixel_array):
-            if self._bpp == 8:
-                reversed_pixels.append(pixel)
-            elif self._bpp == 4:
-                pixel_low = pixel & 0x0f
-                pixel_high = (pixel >> 4) & 0x0f
-                reversed_pixels.append(pixel_low * 16 + pixel_high)
+        pixel_lines = self._get_lines()
+        reversed_lines = reversed(pixel_lines)
+
+        for line in reversed_lines:
+            if self._line_bytes_padding != 0:
+                padding = line[-self._line_bytes_padding:]
+                pixels = line[:-self._line_bytes_padding]
+            else:
+                padding = list()
+                pixels = line
+            for pixel in reversed(pixels):
+                if self._bpp == 8:
+                    reversed_pixels.append(pixel)
+                elif self._bpp == 4:
+                    pixel_low = pixel & 0x0f
+                    pixel_high = (pixel >> 4) & 0x0f
+                    reversed_pixels.append(pixel_low * 16 + pixel_high)
+
+            reversed_pixels = reversed_pixels + padding
 
         self._bmp_pixel_array = reversed_pixels
 
@@ -151,9 +170,19 @@ x.reverse()
 x.dump("out/dumpRev.bmp", add_header=True, use_bytes=True, delimiter="")
 
 x = BmpDump("testdata/mirror.bmp")
-x.rotate180()
+x.upside_down()
 x.dump("out/dumpRot.bmp", add_header=True, use_bytes=True, delimiter="")
 
 x = BmpDump("testdata/mirror.bmp")
 x.mirror()
 x.dump("out/dumpMirr.bmp", add_header=True, use_bytes=True, delimiter="")
+
+for sel_col in range(16):
+    one_color = {0: sel_col, 1: sel_col, 2: sel_col, 3: sel_col,
+                 4: sel_col, 5: sel_col, 6: sel_col, 7: sel_col,
+                 8: sel_col, 9: sel_col, 10: sel_col, 11: sel_col,
+                 12: sel_col, 13: sel_col, 14: sel_col, 15: sel_col}
+    x = BmpDump("testdata/mirror.bmp")
+    x.flip_colors(one_color)
+    file_name = "out/dumpcolor" + str(sel_col) + ".bmp"
+    x.dump(file_name, add_header=True, use_bytes=True, delimiter="")
